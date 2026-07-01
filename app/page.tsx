@@ -335,6 +335,50 @@ function TabButton({
   );
 }
 
+function showActionToast(message: string, tone: "info" | "success" | "error" = "info") {
+  if (typeof document === "undefined") return;
+
+  const id = "content-os-action-toast";
+  let box = document.getElementById(id);
+
+  if (!box) {
+    box = document.createElement("div");
+    box.id = id;
+    box.style.position = "fixed";
+    box.style.left = "50%";
+    box.style.bottom = "24px";
+    box.style.transform = "translateX(-50%)";
+    box.style.zIndex = "99999";
+    box.style.borderRadius = "18px";
+    box.style.padding = "13px 18px";
+    box.style.fontSize = "14px";
+    box.style.fontWeight = "900";
+    box.style.color = "#ffffff";
+    box.style.boxShadow = "0 24px 80px rgba(0,0,0,.35)";
+    box.style.backdropFilter = "blur(16px)";
+    box.style.transition = "opacity .2s ease, transform .2s ease";
+    document.body.appendChild(box);
+  }
+
+  box.textContent = message;
+  box.style.opacity = "1";
+  box.style.transform = "translateX(-50%) translateY(0)";
+  box.style.border = "1px solid rgba(255,255,255,.18)";
+  box.style.background =
+    tone === "success"
+      ? "rgba(22,163,74,.96)"
+      : tone === "error"
+      ? "rgba(220,38,38,.96)"
+      : "rgba(15,23,42,.96)";
+
+  window.clearTimeout((window as any).__contentOsToastTimer);
+  (window as any).__contentOsToastTimer = window.setTimeout(() => {
+    if (box) {
+      box.style.opacity = "0";
+      box.style.transform = "translateX(-50%) translateY(10px)";
+    }
+  }, 2400);
+}
 export default function Home() {
   const pathname = usePathname();
 
@@ -911,35 +955,46 @@ export default function Home() {
 
   async function deleteTeamMember(id?: string) {
     if (!id) return;
-    if (!confirm("Kya aap is team member ko delete karna chahte hain?")) return;
+
+    showActionToast("Deleting team member...", "info");
 
     const { error } = await supabase.from("team_members").delete().eq("id", id);
-    if (error) return alert(error.message);
+    if (error) {
+      showActionToast("Team member delete failed", "error");
+      return alert(error.message);
+    }
 
     await createActivityLog("Team member deleted", "team_members", id);
-    loadTeamMembers();
-    loadAccounts();
-    loadPages();
-  }
+    await loadTeamMembers();
+    await loadAccounts();
+    await loadPages();
 
+    showActionToast("Team member deleted successfully", "success");
+  }
   async function deleteAccount(account: AccountItem) {
     if (!account.id) return;
-    if (!confirm("Kya aap is account ko delete karna chahte hain?")) return;
+
+    showActionToast("Deleting account...", "info");
 
     if (account.profile_image_path) await supabase.storage.from("account-images").remove([account.profile_image_path]);
 
     const { error } = await supabase.from("facebook_accounts").delete().eq("id", account.id);
-    if (error) return alert(error.message);
+    if (error) {
+      showActionToast("Account delete failed", "error");
+      return alert(error.message);
+    }
 
     await createActivityLog(`Facebook account deleted: ${account.account_name}`, "facebook_accounts", account.id, account.team_member_id || null);
-    loadAccounts();
-    loadPages();
-  }
+    await loadAccounts();
+    await loadPages();
 
+    showActionToast("Account deleted successfully", "success");
+  }
   async function deletePage(id?: string) {
     if (!id) return;
     const page = getPage(id);
-    if (!confirm("Kya aap is page ko delete karna chahte hain?")) return;
+
+    showActionToast("Deleting page...", "info");
 
     const pageVideos = videos.filter((video) => video.page_id === id);
     const paths = pageVideos.map((video) => video.storage_path).filter(Boolean) as string[];
@@ -947,30 +1002,48 @@ export default function Home() {
     if (paths.length > 0) await supabase.storage.from("videos").remove(paths);
 
     const { error } = await supabase.from("facebook_pages").delete().eq("id", id);
-    if (error) return alert(error.message);
+    if (error) {
+      showActionToast("Page delete failed", "error");
+      return alert(error.message);
+    }
 
     await createActivityLog(`Facebook page deleted: ${page?.page_name || "page"}`, "facebook_pages", id, page?.team_member_id || null);
-    loadPages();
-    loadVideos();
-  }
+    await loadPages();
+    await loadVideos();
 
+    showActionToast("Page deleted successfully", "success");
+  }
   async function deleteVideosList(list: VideoItem[], label: string) {
     if (list.length === 0) return alert("No videos found");
-    const confirmText = prompt(`${label} delete karne ke liye DELETE type karo`);
-    if (confirmText !== "DELETE") return;
 
     const paths = list.map((video) => video.storage_path).filter(Boolean) as string[];
     const ids = list.map((video) => video.id).filter(Boolean) as string[];
 
-    if (paths.length > 0) await supabase.storage.from("videos").remove(paths);
+    showActionToast(`Deleting ${label} in background...`, "info");
 
     if (ids.length > 0) {
-      const { error } = await supabase.from("videos").delete().in("id", ids);
-      if (error) return alert(error.message);
+      setVideos((current) => current.filter((video) => !video.id || !ids.includes(video.id)));
+    }
+
+    const storagePromise = paths.length > 0
+      ? supabase.storage.from("videos").remove(paths)
+      : Promise.resolve({ error: null });
+
+    const databasePromise = ids.length > 0
+      ? supabase.from("videos").delete().in("id", ids)
+      : Promise.resolve({ error: null });
+
+    const [storageResult, databaseResult] = await Promise.all([storagePromise, databasePromise]);
+
+    if (storageResult.error || databaseResult.error) {
+      showActionToast("Delete failed, refreshing data...", "error");
+      await loadVideos();
+      return alert(storageResult.error?.message || databaseResult.error?.message || "Delete failed");
     }
 
     await createActivityLog(`${label} deleted (${list.length} videos)`, "videos");
-    loadVideos();
+
+    showActionToast(`${label} deleted successfully`, "success");
   }
 
   async function deleteVideo(video: VideoItem) {
@@ -1719,7 +1792,7 @@ export default function Home() {
                           </div>
                           <div className="flex flex-wrap gap-2">
                             <Badge tone="blue">{group.videos.length} Videos</Badge>
-                            <button onClick={() => toggleGroup(group.key)} className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white">{expanded ? "Hide Videos" : "Open Folder"}</button>
+                            <button onClick={() => toggleGroup(group.key)} className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white">{expanded ? "Hide Videos" : "Show Videos"}</button>
                             <button onClick={() => deleteVideosList(group.videos, `${group.pageName} / ${group.folderName}`)} className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white">Delete Folder</button>
                             {page?.page_link && <a href={safeLink(page.page_link)} target="_blank" rel="noreferrer" className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white">Open Page</a>}
                           </div>
@@ -1803,3 +1876,7 @@ export default function Home() {
     </main>
   );
 }
+
+
+
+
