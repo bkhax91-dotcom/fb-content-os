@@ -42,6 +42,7 @@ type PageItem = {
   team_member_id?: string | null;
   page_name: string;
   page_link: string;
+  drive_folder_link?: string | null;
   page_category?: string;
   page_status?: string;
   page_health?: string | null;
@@ -427,6 +428,7 @@ export default function Home() {
 
   const [pageName, setPageName] = useState("");
   const [pageLink, setPageLink] = useState("");
+  const [driveFolderLink, setDriveFolderLink] = useState("");
   const [pageCategory, setPageCategory] = useState("");
   const [pageAccountId, setPageAccountId] = useState("");
   const [pageTeamMemberId, setPageTeamMemberId] = useState("");
@@ -760,6 +762,7 @@ export default function Home() {
         team_member_id: pageTeamMemberId || null,
         page_name: pageName,
         page_link: pageLink,
+        drive_folder_link: driveFolderLink || null,
         page_category: pageCategory,
         page_status: "active",
         page_health: pageHealth,
@@ -778,6 +781,7 @@ export default function Home() {
 
     setPageName("");
     setPageLink("");
+    setDriveFolderLink("");
     setPageCategory("");
     setPageAccountId("");
     setPageTeamMemberId("");
@@ -908,6 +912,8 @@ export default function Home() {
     if (newName === null) return;
     const newLink = prompt("New page link:", page.page_link);
     if (newLink === null) return;
+    const newDriveLink = prompt("Google Drive folder link:", page.drive_folder_link || "");
+    if (newDriveLink === null) return;
     const newCategory = prompt("New page category:", page.page_category || "");
     if (newCategory === null) return;
     const newHealth = prompt("Page health: good / average / red / unknown", page.page_health || "unknown");
@@ -926,6 +932,7 @@ export default function Home() {
       .update({
         page_name: newName,
         page_link: newLink,
+        drive_folder_link: newDriveLink || null,
         page_category: newCategory,
         page_health: newHealth || "unknown",
         followers_count: Number(newFollowers || 0),
@@ -1099,6 +1106,7 @@ export default function Home() {
       const haystack = searchText([
         page.page_name,
         page.page_link,
+        page.drive_folder_link,
         page.page_category,
         page.page_status,
         page.page_health,
@@ -1178,6 +1186,7 @@ export default function Home() {
       const haystack = searchText([
         page.page_name,
         page.page_link,
+        page.drive_folder_link,
         page.page_category,
         page.page_health,
         account?.account_name,
@@ -1668,9 +1677,10 @@ export default function Home() {
 
               <PremiumCard darkMode={darkMode} className="mt-6">
                 <h3 className="text-xl font-black">Add Facebook Page</h3>
-                <div className="mt-4 grid gap-3 md:grid-cols-2 2xl:grid-cols-5">
+                <div className="mt-4 grid gap-3 md:grid-cols-2 2xl:grid-cols-6">
                   <input className={inputClass} placeholder="Page Name" value={pageName} onChange={(event) => setPageName(event.target.value)} />
                   <input className={inputClass} placeholder="Page Link" value={pageLink} onChange={(event) => setPageLink(event.target.value)} />
+                  <input className={inputClass} placeholder="Google Drive Folder Link" value={driveFolderLink} onChange={(event) => setDriveFolderLink(event.target.value)} />
                   <select className={inputClass} value={pageCategory} onChange={(event) => setPageCategory(event.target.value)}><option value="">Select Category</option>{pageCategories.map((category) => <option key={category} value={category}>{category}</option>)}</select>
                   <select className={inputClass} value={pageAccountId} onChange={(event) => setPageAccountId(event.target.value)}><option value="">Select Account</option>{accounts.map((account) => <option key={account.id} value={account.id}>{account.account_name}</option>)}</select>
                   <select className={inputClass} value={pageTeamMemberId} onChange={(event) => setPageTeamMemberId(event.target.value)}><option value="">Team optional</option>{teamMembers.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}</select>
@@ -1724,6 +1734,7 @@ export default function Home() {
 
                             <div className="mt-4 flex flex-wrap gap-2">
                               <a href={safeLink(page.page_link)} target="_blank" rel="noreferrer" className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white">Open Facebook Page</a>
+                              {page.drive_folder_link && <a href={safeLink(page.drive_folder_link)} target="_blank" rel="noreferrer" className="rounded-xl bg-green-600 px-4 py-2 text-sm font-bold text-white">Open Drive Folder</a>}
                               {account?.account_link && <a href={safeLink(account.account_link)} target="_blank" rel="noreferrer" className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white">Open Linked ID</a>}
                             </div>
                           </div>
